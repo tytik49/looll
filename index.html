@@ -2,93 +2,140 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Мой Чат GPT</title>
+  <title>Мой ChatGPT</title>
   <style>
     body {
       background: #111;
-      color: #fff;
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      color: white;
     }
-    .chatbox {
-      background: #222;
-      padding: 20px;
-      border-radius: 10px;
+
+    .chat {
+      background: #1e1e1e;
+      border-radius: 12px;
       width: 500px;
-      max-width: 90%;
+      height: 600px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 20px rgba(0,0,0,0.6);
+      overflow: hidden;
     }
-    #messages {
-      height: 300px;
+
+    .messages {
+      flex: 1;
+      padding: 15px;
       overflow-y: auto;
-      margin-bottom: 10px;
-      padding: 10px;
-      border: 1px solid #444;
-      background: #000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
+
     .msg {
-      padding: 8px;
-      margin: 5px 0;
-      border-radius: 5px;
+      padding: 10px 15px;
+      border-radius: 10px;
+      max-width: 80%;
+      line-height: 1.4em;
     }
-    .user { background: #0055ff; text-align: right; }
-    .bot { background: #333; text-align: left; }
-    input {
-      width: 75%;
-      padding: 8px;
+
+    .user {
+      background: #0059ff;
+      align-self: flex-end;
     }
-    button {
-      width: 20%;
-      padding: 8px;
-      margin-left: 5px;
+
+    .bot {
+      background: #333;
+      align-self: flex-start;
+    }
+
+    .input-area {
+      display: flex;
+      border-top: 1px solid #333;
+      background: #222;
+      padding: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .input-area button {
+      margin-left: 10px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #0059ff;
+      color: white;
+      font-weight: bold;
       cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .input-area button:hover {
+      background: #0041c4;
     }
   </style>
 </head>
 <body>
-  <div class="chatbox">
-    <div id="messages"></div>
-    <input id="query" type="text" placeholder="Задай вопрос...">
-    <button onclick="search()">Отправить</button>
+  <div class="chat">
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <input id="query" type="text" placeholder="Напиши что-то...">
+      <button onclick="search()">Отправить</button>
+    </div>
   </div>
 
-<script>
-async function search() {
-  let query = document.getElementById("query").value;
-  if (!query) return;
+  <script>
+    async function search() {
+      let query = document.getElementById("query").value.trim();
+      if (!query) return;
 
-  // показываем вопрос
-  let messages = document.getElementById("messages");
-  messages.innerHTML += `<div class="msg user">${query}</div>`;
-  document.getElementById("query").value = "";
+      let messages = document.getElementById("messages");
+      messages.innerHTML += `<div class="msg user">${query}</div>`;
+      document.getElementById("query").value = "";
 
-  let apiKey = "AIzaSyBUpPHFROM1FOQhfS4WfGkphkGMUjr02ZY"; // твой ключ
-  let cx = "d1cc8ed99be7448c6"; // твой cx из Google CSE
-  let url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}`;
+      // Твой ключ и CX
+      let apiKey = "AIzaSyBUpPHFROM1FOQhfS4WfGkphkGMUjr02ZY";
+      let cx = "d1cc8ed99be7448c6";
 
-  messages.innerHTML += `<div class="msg bot">Ищу ответ...</div>`;
+      let url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}`;
 
-  try {
-    let res = await fetch(url);
-    let data = await res.json();
+      messages.innerHTML += `<div class="msg bot">Ищу ответ...</div>`;
 
-    messages.lastChild.remove(); // убираем "Ищу ответ..."
+      try {
+        let res = await fetch(url);
+        let data = await res.json();
 
-    if (data.items && data.items.length > 0) {
-      let answer = data.items[0].snippet;
-      let link = data.items[0].link;
-      messages.innerHTML += `<div class="msg bot">${answer}<br><a href="${link}" target="_blank">Подробнее</a></div>`;
-    } else {
-      messages.innerHTML += `<div class="msg bot">Ничего не найдено :(</div>`;
+        messages.lastChild.remove(); // убираем "Ищу ответ..."
+
+        if (data.items && data.items.length > 0) {
+          let snippets = [...new Set(data.items.map(i => i.snippet))]; // убираем дубли
+          let answer = snippets.slice(0, 3).join(" "); // берём первые 3
+          messages.innerHTML += `<div class="msg bot">${answer}</div>`;
+        } else {
+          messages.innerHTML += `<div class="msg bot">Ничего не нашёл :(</div>`;
+        }
+
+        messages.scrollTop = messages.scrollHeight;
+      } catch (err) {
+        messages.innerHTML += `<div class="msg bot">Ошибка: ${err.message}</div>`;
+      }
     }
 
-    messages.scrollTop = messages.scrollHeight;
-  } catch (err) {
-    messages.innerHTML += `<div class="msg bot">Ошибка: ${err.message}</div>`;
-  }
-}
-</script>
+    // Enter для отправки
+    document.getElementById("query").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") search();
+    });
+  </script>
 </body>
 </html>
