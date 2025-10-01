@@ -1,48 +1,193 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Мой чат GPT</title>
+  <meta charset="utf-8">
+  <title>Чат-поиск (без сервера)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; background: #111; color: #fff; }
-    #chat { width: 400px; margin: 50px auto; background: #222; padding: 15px; border-radius: 10px; }
-    .message { margin: 5px 0; padding: 8px; border-radius: 5px; }
-    .user { background: #0057e7; text-align: right; }
-    .bot { background: #444; }
-    input { padding: 5px; }
-    button { padding: 5px 10px; }
+    :root{
+      --bg:#0f1113; --panel:#151617; --user:#0057e7; --bot:#2b2b2b; --muted:#9aa0a6;
+      --radius:14px;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0d 0%, #0f1113 100%);color:#fff}
+    .wrap{max-width:700px;margin:40px auto;padding:20px}
+    .card{
+      background:var(--panel);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 6px 30px rgba(0,0,0,0.6);
+    }
+
+    h1{font-size:18px;margin:0 0 10px 0;color:#fff}
+    #chat { height:60vh; display:flex; flex-direction:column; gap:8px; overflow:auto; padding:8px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); }
+    .row{display:flex; align-items:flex-end; gap:8px; max-width:100%;}
+    .msg{padding:10px 14px; border-radius:12px; max-width:78%; word-break:break-word; box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+    .bot{background:var(--bot); align-self:flex-start; border-bottom-left-radius:6px}
+    .user{background:var(--user); align-self:flex-end; border-bottom-right-radius:6px; color:#fff}
+    .meta{font-size:12px;color:var(--muted); margin-top:6px}
+
+    .input-area{display:flex; gap:8px; margin-top:12px}
+    input[type="text"]{
+      flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:#fff;outline:none;font-size:14px
+    }
+    button{padding:10px 14px;border-radius:10px;border:none;background:var(--user);color:#fff;cursor:pointer}
+    button:active{transform:translateY(1px)}
+
+    a.source{display:inline-block;margin-top:6px;color:#9fd1ff;font-size:13px;text-decoration:none}
+    .small{font-size:13px;color:var(--muted)}
+    .spinner{width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.06);border-top-color:var(--user);animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media (max-width:520px){ .wrap{margin:12px} #chat{height:55vh} }
   </style>
 </head>
 <body>
-  <div id="chat">
-    <div id="messages"></div>
-    <input type="text" id="input" placeholder="Задай вопрос..." style="width: 70%;">
-    <button onclick="sendMessage()">Отправить</button>
+  <div class="wrap">
+    <div class="card">
+      <h1>Чат-поиск (без сервера)</h1>
+      <div id="chat" aria-live="polite"></div>
+
+      <div class="input-area">
+        <input id="q" type="text" placeholder="Например: 'что такое дверь'">
+        <button id="send">Отправить</button>
+      </div>
+      <div class="meta small">Использует DuckDuckGo Instant Answer и Википедию. Без сервера — прямые запросы из браузера.</div>
+    </div>
   </div>
 
   <script>
-    async function sendMessage() {
-      let input = document.getElementById("input");
-      let messages = document.getElementById("messages");
+    const chatEl = document.getElementById('chat');
+    const qEl = document.getElementById('q');
+    const btn = document.getElementById('send');
 
-      // показываем вопрос
-      let userMsg = document.createElement("div");
-      userMsg.className = "message user";
-      userMsg.innerText = input.value;
-      messages.appendChild(userMsg);
+    btn.addEventListener('click', onSend);
+    qEl.addEventListener('keydown', e => { if (e.key === 'Enter') onSend(); });
 
-      // отправляем на сервер (ВАЖНО: замени URL на твой Render backend!)
-      let res = await fetch("https://my-chat.onrender.com/search?q=" + encodeURIComponent(input.value));
-      let data = await res.json();
-
-      // показываем ответ
-      let botMsg = document.createElement("div");
-      botMsg.className = "message bot";
-      botMsg.innerText = data.answer;
-      messages.appendChild(botMsg);
-
-      input.value = "";
+    function appendUser(text){
+      const d = document.createElement('div');
+      d.className = 'row';
+      d.innerHTML = `<div class="msg user">${escapeHtml(text)}</div>`;
+      chatEl.appendChild(d);
+      chatEl.scrollTop = chatEl.scrollHeight;
     }
+    function appendBot(text, sourceLink){
+      const d = document.createElement('div');
+      d.className = 'row';
+      const content = document.createElement('div');
+      content.className = 'msg bot';
+      content.innerHTML = `<div>${escapeHtml(text)}</div>`;
+      if (sourceLink){
+        const a = document.createElement('a');
+        a.className = 'source';
+        a.href = sourceLink;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = 'Источник →';
+        content.appendChild(a);
+      }
+      d.appendChild(content);
+      chatEl.appendChild(d);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+    function appendTempSpinner(){
+      const d = document.createElement('div');
+      d.className = 'row';
+      const content = document.createElement('div');
+      content.className = 'msg bot';
+      content.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div class="spinner"></div><div>Печатает...</div></div>`;
+      d.appendChild(content);
+      chatEl.appendChild(d);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return content; // можно обновить позже
+    }
+
+    async function onSend(){
+      const q = qEl.value.trim();
+      if (!q) return;
+      appendUser(q);
+      qEl.value = '';
+
+      const spinner = appendTempSpinner();
+
+      try {
+        // 1) Попробуем DuckDuckGo Instant Answer
+        const ddgUrl = 'https://api.duckduckgo.com/?q=' + encodeURIComponent(q) + '&format=json&no_html=1&skip_disambig=1';
+        const ddgResp = await fetch(ddgUrl);
+        const ddg = await ddgResp.json();
+
+        // ddg.Answer, ddg.AbstractText, ddg.RelatedTopics...
+        let answer = '';
+        let source = '';
+
+        if (ddg.Answer && ddg.Answer.length > 0) {
+          answer = ddg.Answer;
+          // иногда есть URL
+          source = ddg.Results && ddg.Results[0] && ddg.Results[0].FirstURL ? ddg.Results[0].FirstURL : '';
+        } else if (ddg.AbstractText && ddg.AbstractText.length > 0) {
+          answer = ddg.AbstractText;
+          source = ddg.AbstractURL || '';
+        } else {
+          // попробуем взять первый релейтед топик с текстом
+          const rt = ddg.RelatedTopics && ddg.RelatedTopics.find(t => t.Text);
+          if (rt && rt.Text) {
+            answer = rt.Text;
+            source = rt.FirstURL || '';
+          }
+        }
+
+        // 2) Если DuckDuckGo ничего не дал — fallback на Википедию (русскую)
+        if (!answer) {
+          // поиск по Википедии
+          const wikiSearch = 'https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(q) + '&utf8=&format=json&origin=*';
+          const wResp = await fetch(wikiSearch);
+          const wJs = await wResp.json();
+          const first = wJs.query && wJs.query.search && wJs.query.search[0];
+          if (first) {
+            // берём содержимое статьи (короткий фрагмент)
+            const pageTitle = first.title;
+            const extractUrl = 'https://ru.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=' + encodeURIComponent(pageTitle) + '&format=json&origin=*';
+            const exResp = await fetch(extractUrl);
+            const exJs = await exResp.json();
+            const pages = exJs.query && exJs.query.pages;
+            const pageKey = pages && Object.keys(pages)[0];
+            const extract = pageKey ? pages[pageKey].extract : '';
+            answer = extract ? extract.split('\n').slice(0,3).join('\n') : first.snippet || '';
+            source = 'https://ru.wikipedia.org/wiki/' + encodeURIComponent(pageTitle.replace(/ /g, '_'));
+          }
+        }
+
+        // 3) Если ничего — покажем подсказку
+        if (!answer) {
+          answer = 'Не смог найти короткий ответ. Попробуй переформулировать вопрос или уточнить тему.';
+        }
+
+        // удаляем временный "печатает" элемент (spinner есть content)
+        spinner.parentElement.remove();
+
+        appendBot(answer, source);
+      } catch (err) {
+        console.error(err);
+        // удаляем печатает...
+        if (spinner && spinner.parentElement) spinner.parentElement.remove();
+        appendBot('Ошибка при поиске. Проверь соединение или попробуй позже.');
+      }
+    }
+
+    // безопасный экранированный вывод
+    function escapeHtml(text){
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>');
+    }
+
+    // автофокус в поле
+    qEl.focus();
   </script>
 </body>
 </html>
