@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Мой чат GPT</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #fff; }
+    #chat { width: 400px; margin: 50px auto; background: #222; padding: 15px; border-radius: 10px; }
+    .message { margin: 5px 0; padding: 8px; border-radius: 5px; }
+    .user { background: #0057e7; text-align: right; }
+    .bot { background: #444; }
+    input { padding: 5px; }
+    button { padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <div id="messages"></div>
+    <input type="text" id="input" placeholder="Задай вопрос..." style="width: 70%;">
+    <button onclick="sendMessage()">Отправить</button>
+  </div>
+
+  <script>
+    async function sendMessage() {
+      let input = document.getElementById("input");
+      let messages = document.getElementById("messages");
+
+      // показываем вопрос
+      let userMsg = document.createElement("div");
+      userMsg.className = "message user";
+      userMsg.innerText = input.value;
+      messages.appendChild(userMsg);
+
+      // отправляем на сервер (ВАЖНО: замени URL на твой Render backend!)
+      let res = await fetch("https://my-chat.onrender.com/search?q=" + encodeURIComponent(input.value));
+      let data = await res.json();
+
+      // показываем ответ
+      let botMsg = document.createElement("div");
+      botMsg.className = "message bot";
+      botMsg.innerText = data.answer;
+      messages.appendChild(botMsg);
+
+      input.value = "";
+    }
+  </script>
+</body>
+</html>
